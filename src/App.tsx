@@ -85,8 +85,13 @@ export default function App() {
         
         if (picture && picture.length > 0) {
           const pic = picture[0];
-          const blob = new Blob([pic.data], { type: pic.format });
-          coverUrl = URL.createObjectURL(blob);
+          const base64String = btoa(
+            new Uint8Array(pic.data).reduce(
+              (data, byte) => data + String.fromCharCode(byte),
+              ''
+            )
+          );
+          coverUrl = `data:${pic.format};base64,${base64String}`;
         }
 
         const newTrack: Track = {
@@ -149,6 +154,55 @@ export default function App() {
     playTrack(prevIndex);
   };
 
+  // Media Session API for Lock Screen Controls
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentTrack) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        album: currentTrack.album,
+        artwork: currentTrack.coverUrl ? [
+          { src: currentTrack.coverUrl, sizes: '512x512', type: 'image/png' }
+        ] : [
+          { src: 'https://picsum.photos/seed/music/512/512', sizes: '512x512', type: 'image/png' }
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        audioRef.current?.play();
+        setPlayerState(prev => ({ ...prev, isPlaying: true }));
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        audioRef.current?.pause();
+        setPlayerState(prev => ({ ...prev, isPlaying: false }));
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
+      navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined && audioRef.current) {
+          audioRef.current.currentTime = details.seekTime;
+        }
+      });
+    }
+  }, [currentTrack, nextTrack, prevTrack]);
+
+  // Update Media Session Playback State
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = playerState.isPlaying ? 'playing' : 'paused';
+    }
+  }, [playerState.isPlaying]);
+
+  useEffect(() => {
+    if ('mediaSession' in navigator && audioRef.current) {
+      navigator.mediaSession.setPositionState({
+        duration: audioRef.current.duration || 0,
+        playbackRate: audioRef.current.playbackRate || 1,
+        position: audioRef.current.currentTime || 0,
+      });
+    }
+  }, [playerState.currentTime, playerState.duration]);
+
   // Audio effects
   useEffect(() => {
     if (audioRef.current && currentTrack) {
@@ -156,7 +210,9 @@ export default function App() {
       audioRef.current.src = url;
       audioRef.current.play();
       
-      return () => URL.revokeObjectURL(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
     }
   }, [currentTrack?.id]);
 
