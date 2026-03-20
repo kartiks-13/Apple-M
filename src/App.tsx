@@ -148,11 +148,11 @@ export default function App() {
     playTrack(nextIndex);
   }, [tracks.length, playerState.currentTrackIndex]);
 
-  const prevTrack = () => {
+  const prevTrack = useCallback(() => {
     if (tracks.length === 0) return;
     const prevIndex = (playerState.currentTrackIndex! - 1 + tracks.length) % tracks.length;
     playTrack(prevIndex);
-  };
+  }, [tracks.length, playerState.currentTrackIndex]);
 
   // Media Session API for Lock Screen Controls
   useEffect(() => {
@@ -178,6 +178,19 @@ export default function App() {
       });
       navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
       navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+      navigator.mediaSession.setActionHandler('stop', () => {
+        audioRef.current?.pause();
+        if (audioRef.current) audioRef.current.currentTime = 0;
+        setPlayerState(prev => ({ ...prev, isPlaying: false, currentTime: 0 }));
+      });
+      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        const skipTime = details.seekOffset || 10;
+        if (audioRef.current) audioRef.current.currentTime = Math.max(audioRef.current.currentTime - skipTime, 0);
+      });
+      navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        const skipTime = details.seekOffset || 10;
+        if (audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.currentTime + skipTime, audioRef.current.duration);
+      });
       navigator.mediaSession.setActionHandler('seekto', (details) => {
         if (details.seekTime !== undefined && audioRef.current) {
           audioRef.current.currentTime = details.seekTime;
@@ -447,6 +460,8 @@ export default function App() {
         onTimeUpdate={() => setPlayerState(prev => ({ ...prev, currentTime: audioRef.current?.currentTime || 0 }))}
         onLoadedMetadata={() => setPlayerState(prev => ({ ...prev, duration: audioRef.current?.duration || 0 }))}
         onEnded={nextTrack}
+        playsInline
+        preload="auto"
       />
 
       {/* Hidden File Input */}
