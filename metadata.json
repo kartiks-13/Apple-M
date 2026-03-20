@@ -1,0 +1,5 @@
+{
+  "name": "Sonic Player",
+  "description": "A beautiful, immersive local music player for your audio collection.",
+  "requestFramePermissions": []
+}
