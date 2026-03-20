@@ -31,7 +31,7 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-  - name: Build with Gradle
+      - name: Build with Gradle
         run: |
           cd android
           gradle assembleDebug
